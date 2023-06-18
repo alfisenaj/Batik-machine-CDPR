@@ -1,0 +1,356 @@
+#include <MatrixMath.h>
+// Define stepper motor connections and steps per revolution:
+#define dirPin1 9
+#define stepPin1 8
+#define dirPin2 7
+#define stepPin2 6
+#define dirPin3 5
+#define stepPin3 4
+#define dirPin4 3
+#define stepPin4 2
+const float stepsPerRevolution = 1600 ;
+const float kelilingExtruder = 33 ; // mm
+
+
+float box_length ;
+float box_width ;
+float box_height ;
+float effector_length ;
+float effector_width ;
+float effector_height ;
+float mag_l_1;
+float mag_l_2;
+float mag_l_3;
+float mag_l_4;
+
+
+float stepperno1 = 0;
+float stepperno2 = 0;
+float stepperno3 = 0;
+bool parsing = false;
+String sData, data[10];
+
+bool isModified = false;
+long prevPos1 = 0;
+long prevPos2 = 0;
+long prevPos3 = 0;
+long prevPos4 = 0;
+
+
+
+void setup() {
+// Declare pins as output:
+pinMode(stepPin1, OUTPUT);
+pinMode(dirPin1, OUTPUT);
+pinMode(stepPin2, OUTPUT);
+pinMode(dirPin2, OUTPUT);
+pinMode(stepPin3, OUTPUT);
+pinMode(dirPin3, OUTPUT);
+pinMode(stepPin4, OUTPUT);
+pinMode(dirPin4, OUTPUT);
+Serial.begin(9600);
+
+//=============== INVERSE KINEMATIC SETUP ===============
+float box_length      = 980;        //in mm
+float box_width       = 480;      //in mm
+float box_height      = 600;      //in mm
+float effector_length = 70;     //in mm
+float effector_width  = 70;     //in mm
+float effector_height = 40;     //in mm
+
+}
+
+void loop() {
+ while (Serial.available())
+  {
+    char inChar = Serial.read();
+    //sData = sData + inChar;
+    sData += inChar;     // penulisan lain dari yg di atas
+    if (inChar == '$')
+    {
+      parsing = true;
+    }
+    if (parsing)
+    {
+      int q = 0;
+      for (int i = 0; i < sData.length(); i++)  //untuk mengambil data yang ada di antara tanda pagar
+      {
+        if (sData[i] == '#')          // jika ketemu tagar, makan hapus
+        {
+          q++;
+          data[q] = "";
+        }
+        else
+        {
+          //data[q] = data[q] + sData[i];     // jika tidak ketemu tagar, teruskan
+          data[q] += sData[i];
+        }
+      }
+      Serial.println("Data masuk:" + sData);
+      stepperno1 = data[1].toInt();
+      stepperno2 = data[2].toInt();
+      stepperno3 = data[3].toInt();
+      Serial.print("Axis X = ");
+      Serial.println(stepperno1);
+      Serial.print("Axis Y = ");
+      Serial.println(stepperno2);
+      Serial.print("Axis Z = ");
+      Serial.println(stepperno3);
+      Serial.println("Stepper jalan selesai");
+      parsing = false;
+      sData = "";
+    }
+  }
+  
+      mtx_type r[3][1]         = {{stepperno1}, {stepperno2}, {stepperno3}}; //r at the middle of the box
+
+      mtx_type R[3][3] = { { 1, 0, 0 }, { 0, 1, 0 }, {0, 0, 1} };
+      
+      // First cable
+      mtx_type a_1[3][1]       = { {0}, {0},  {box_height} };
+      mtx_type b_1[3][1]       = {{ -0.5 * effector_length}, { -0.5 * effector_width}, {0.5 * effector_height}};
+      mtx_type Rb_1[3][1]; //temporary value for R * b_i
+      mtx_type ar_1[3][1]; //temporay value for a_i - r
+      mtx_type l_1 [3][1];
+      
+      // Second cable
+      mtx_type a_2[3][1]       = { {0}, {box_width},  {box_height} };
+      mtx_type b_2[3][1]       = {{ -0.5 * effector_length}, { 0.5 * effector_width}, {0.5 * effector_height}};
+      mtx_type Rb_2[3][1]; //temporary value for R * b_i
+      mtx_type ar_2[3][1]; //temporay value for a_i - r
+      mtx_type l_2 [3][1];
+
+      // third cable
+      mtx_type a_3[3][1]       = { {box_length}, {0},  {box_height} };
+      mtx_type b_3[3][1]       = {{ 0.5 * effector_length}, { -0.5 * effector_width}, {0.5 * effector_height}};
+      mtx_type Rb_3[3][1]; //temporary value for R * b_i
+      mtx_type ar_3[3][1]; //temporay value for a_i - r
+      mtx_type l_3 [3][1];
+
+      // fourth cable
+      mtx_type a_4[3][1]       = { {box_length}, {box_width},  {box_height} };
+      mtx_type b_4[3][1]       = {{ 0.5 * effector_length}, { 0.5 * effector_width}, {0.5 * effector_height}};
+      mtx_type Rb_4[3][1]; //temporary value for R * b_i
+      mtx_type ar_4[3][1]; //temporay value for a_i - r
+      mtx_type l_4 [3][1];
+
+      
+      // Inverse Kinematic: l_i = a_i - r - R * b_i;
+      Matrix.Multiply((mtx_type*)R, (mtx_type*)b_1, 3, 3, 1, (mtx_type*)Rb_1);
+      Matrix.Subtract((mtx_type*) a_1, (mtx_type*) r, 3, 1, (mtx_type*) ar_1);
+      Matrix.Subtract((mtx_type*) ar_1, (mtx_type*) Rb_1, 3, 1, (mtx_type*) l_1);
+      //Matrix.Print((mtx_type*)l_1, 3, 1, "l_1");
+      mag_l_1 = sqrt(pow((l_1[-1][1]), 2) + pow((l_1[0][1]), 2) + pow((l_1[1][1]), 2));
+      //Serial.print("Norm of l_1 = ");
+      //Serial.println(mag_l_1);
+
+      Matrix.Multiply((mtx_type*)R, (mtx_type*)b_2, 3, 3, 1, (mtx_type*)Rb_2);
+      Matrix.Subtract((mtx_type*) a_2, (mtx_type*) r, 3, 1, (mtx_type*) ar_2);
+      Matrix.Subtract((mtx_type*) ar_2, (mtx_type*) Rb_2, 3, 1, (mtx_type*) l_2);
+      mag_l_2 = sqrt(pow((l_2[-1][1]), 2) + pow((l_2[0][1]), 2) + pow((l_2[1][1]), 2));
+
+      Matrix.Multiply((mtx_type*)R, (mtx_type*)b_3, 3, 3, 1, (mtx_type*)Rb_3);
+      Matrix.Subtract((mtx_type*) a_3, (mtx_type*) r, 3, 1, (mtx_type*) ar_3);
+      Matrix.Subtract((mtx_type*) ar_3, (mtx_type*) Rb_3, 3, 1, (mtx_type*) l_3);
+      mag_l_3 = sqrt(pow((l_3[-1][1]), 2) + pow((l_3[0][1]), 2) + pow((l_3[1][1]), 2));
+    
+      Matrix.Multiply((mtx_type*)R, (mtx_type*)b_4, 3, 3, 1, (mtx_type*)Rb_4);
+      Matrix.Subtract((mtx_type*) a_4, (mtx_type*) r, 3, 1, (mtx_type*) ar_4);
+      Matrix.Subtract((mtx_type*) ar_4, (mtx_type*) Rb_4, 3, 1, (mtx_type*) l_4);
+      mag_l_4 = sqrt(pow((l_4[-1][1]), 2) + pow((l_4[0][1]), 2) + pow((l_4[1][1]), 2));
+    
+
+float targetPosition1 = mag_l_1 ;  // Membaca posisi target dari Serial Monitor
+float targetPosition2 = mag_l_2 ;  // Membaca posisi target dari Serial Monitor
+float targetPosition3 = mag_l_3 ;  // Membaca posisi target dari Serial Monitor
+float targetPosition4 = mag_l_4 ;  // Membaca posisi target dari Serial Monitor
+
+float step1=kelilingExtruder/stepsPerRevolution; // setting mm/step
+
+float jumlahtstep1=targetPosition1/step1;
+float jumlahtstep2=targetPosition2/step1;
+float jumlahtstep3=targetPosition3/step1;
+float jumlahtstep4=targetPosition4/step1;
+
+int stp1 = float(jumlahtstep1);
+int stp2 = float(jumlahtstep2);
+int stp3 = float(jumlahtstep3);
+int stp4 = float(jumlahtstep4);
+
+//Serial.println(jumlahtstep);
+//Serial.println(stp);
+
+//koordinat 
+long X1 = stp1 ; 
+long X2 = stp2 ; 
+long X3 = stp3 ; 
+long X4 = stp4 ; 
+
+gerakstepper (X1, X2, X3, X4, prevPos1, prevPos2, prevPos3, prevPos4) ;
+
+prevPos1 = X1 ;
+prevPos2 = X2 ;
+prevPos3 = X3 ;
+prevPos4 = X4 ;
+
+}
+   
+void gerakstepper (long X1,long X2, long X3,long X4, long prevPos1, long prevPos2, long prevPos3, long prevPos4)
+{
+    long jmlstp1 = X1 - prevPos1;
+    long jmlstp2 = X2 - prevPos2;
+    long jmlstp3 = X3 - prevPos3;
+    long jmlstp4 = X4 - prevPos4;
+    
+    if (X1 > prevPos1) {
+      // Set the spinning direction clockwise:
+      digitalWrite(dirPin1, HIGH);
+      Serial.print("Ulur : ");
+      Serial.println(jmlstp1);
+      
+      for (long i = 0; i < jmlstp1; i++) {
+      // These four lines result in 1 step:
+      digitalWrite(stepPin1, HIGH);
+      delayMicroseconds(500);
+      digitalWrite(stepPin1, LOW);
+      delayMicroseconds(500);
+      }
+      Serial.println(X1);
+      Serial.println(mag_l_1);
+    }
+     if (X1 < prevPos1) {
+      digitalWrite(dirPin1, LOW);
+      Serial.print("Tarik : ");
+      Serial.println(jmlstp1);
+      for (long i = 0; i > jmlstp1; i--) {
+      // These four lines result in 1 step:
+      digitalWrite(stepPin1, HIGH);
+      delayMicroseconds(500);
+      digitalWrite(stepPin1, LOW);
+      delayMicroseconds(500);
+      }
+      Serial.println(X1);
+      Serial.println(mag_l_1);
+    }
+    else {
+      //Serial.print("Motor Diam di posisi: ");
+      //Serial.println("0");
+      //stepperno1 = 0;
+     // stepperno2 = 0;
+      //stepperno3 = 0;
+    }  
+
+    if (X2 > prevPos2) {
+      // Set the spinning direction clockwise:
+      digitalWrite(dirPin2, HIGH);
+      Serial.print("Ulur : ");
+      Serial.println(jmlstp2);
+      
+      for (long o = 0; o < jmlstp2; o++) {
+      // These four lines result in 1 step:
+      digitalWrite(stepPin2, HIGH);
+      delayMicroseconds(500);
+      digitalWrite(stepPin2, LOW);
+      delayMicroseconds(500);
+      }
+      Serial.println(X2);
+      Serial.println(mag_l_2);
+    }
+     if (X2 < prevPos2) {
+      digitalWrite(dirPin2, LOW);
+      Serial.print("Tarik : ");
+      Serial.println(jmlstp2);
+      for (long o = 0; o > jmlstp2; o--) {
+      // These four lines result in 1 step:
+      digitalWrite(stepPin2, HIGH);
+      delayMicroseconds(500);
+      digitalWrite(stepPin2, LOW);
+      delayMicroseconds(500);
+      }
+      Serial.println(X2);
+      Serial.println(mag_l_2);
+    }
+    else {
+      //Serial.print("Motor Diam di posisi: ");
+      //Serial.println("0");
+      //stepperno1 = 0;
+     // stepperno2 = 0;
+      //stepperno3 = 0;
+    }  
+
+    if (X3 > prevPos3) {
+      // Set the spinning direction clockwise:
+      digitalWrite(dirPin3, HIGH);
+      Serial.print("Ulur : ");
+      Serial.println(jmlstp3);
+      
+      for (long p = 0; p < jmlstp3; p++) {
+      // These four lines result in 1 step:
+      digitalWrite(stepPin3, HIGH);
+      delayMicroseconds(500);
+      digitalWrite(stepPin3, LOW);
+      delayMicroseconds(500);
+      }
+      Serial.println(X3);
+      Serial.println(mag_l_3);
+    }
+     if (X3 < prevPos3) {
+      digitalWrite(dirPin3, LOW);
+      Serial.print("Tarik : ");
+      Serial.println(jmlstp3);
+      for (long p = 0; p > jmlstp3; p--) {
+      // These four lines result in 1 step:
+      digitalWrite(stepPin3, HIGH);
+      delayMicroseconds(500);
+      digitalWrite(stepPin3, LOW);
+      delayMicroseconds(500);
+      }
+      Serial.println(X3);
+      Serial.println(mag_l_3);
+    }
+    else {
+      //Serial.print("Motor Diam di posisi: ");
+      //Serial.println("0");
+      //stepperno1 = 0;
+     // stepperno2 = 0;
+      //stepperno3 = 0;
+    }
+
+      if (X4 > prevPos4) {
+      // Set the spinning direction clockwise:
+      digitalWrite(dirPin4, HIGH);
+      Serial.print("Ulur : ");
+      Serial.println(jmlstp4);
+      
+      for (long q = 0; q < jmlstp4; q++) {
+      // These four lines result in 1 step:
+      digitalWrite(stepPin4, HIGH);
+      delayMicroseconds(500);
+      digitalWrite(stepPin4, LOW);
+      delayMicroseconds(500);
+      }
+      Serial.println(X4);
+      Serial.println(mag_l_4);
+    }
+     if (X4 < prevPos4) {
+      digitalWrite(dirPin4, LOW);
+      Serial.print("Tarik : ");
+      Serial.println(jmlstp4);
+      for (long q = 0; q > jmlstp4; q--) {
+      // These four lines result in 1 step:
+      digitalWrite(stepPin4, HIGH);
+      delayMicroseconds(500);
+      digitalWrite(stepPin4, LOW);
+      delayMicroseconds(500);
+      }
+      Serial.println(X4);
+      Serial.println(mag_l_4);
+    }
+    else {
+      //Serial.print("Motor Diam di posisi: ");
+      //Serial.println("0");
+      //stepperno1 = 0;
+     // stepperno2 = 0;
+      //stepperno3 = 0;
+    }  
+}
