@@ -8,6 +8,13 @@ void setup() {
   initXYZ();
   initStepper();
   Serial.begin(9600);
+  handleGetRoot();
+
+
+  server.addHandler(&events);
+
+  // Start server
+  server.begin();
 }
 
 
