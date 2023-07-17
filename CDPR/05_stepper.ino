@@ -1,5 +1,8 @@
 #include <digitalWriteFast.h>
 
+const float maxSpeed = 1.0;
+const int minDelayPerStep = 20; // us
+
 // Define stepper motor connections and steps per revolution:
 #define dirPin1 9
 #define stepPin1 8
@@ -23,11 +26,11 @@ void initStepper(){
 }
 
 
-void smoothStep(int pin) {
+void smoothStep(int pin, float speed) {
   digitalWriteFast(pin, HIGH);
-  delayMicroseconds(20);
+  delayMicroseconds(maxSpeed/speed * minDelayPerStep);
   digitalWriteFast(pin, LOW);
-  delayMicroseconds(20);
+  delayMicroseconds(maxSpeed/speed * minDelayPerStep);
   //for (int i = 1; i <= 4; i++) {
   //  digitalWriteFast(pin, (1.0 - cosf(PI*i/2.0))/2.0);
   //}
@@ -48,28 +51,28 @@ void gerakStepper(int step1, int step2, int step3, int step4) {
     // 1st stepper
     if (step1 != 0) {
       if ((int) floor(fmodf(i, (float) stepMax/fabs(step1))) == 0) {
-        smoothStep(stepPin3);
+        smoothStep(stepPin3, 0.5);
       }
     }
 
     // 2nd stepper
     if (step2 != 0) {
       if ((int) floor(fmodf(i, (float) stepMax/fabs(step2))) == 0) {
-        smoothStep(stepPin1);
+        smoothStep(stepPin1, 0.5);
       }
     }
 
     // 3rd stepper
     if (step3 != 0) {
       if ((int) floor(fmodf(i, (float) stepMax/fabs(step3))) == 0) {
-        smoothStep(stepPin2);
+        smoothStep(stepPin2, 0.5);
       }
     }
 
     // 4th stepper
     if (step4 != 0) {
       if ((int) floor(fmodf(i, (float) stepMax/fabs(step4))) == 0) {
-        smoothStep(stepPin4);
+        smoothStep(stepPin4, 0.5);
       }
     }
   }
